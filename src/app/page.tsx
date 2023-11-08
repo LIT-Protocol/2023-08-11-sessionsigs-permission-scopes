@@ -69,7 +69,6 @@ export default function Home() {
     const litContracts = new LitContracts();
   }
 
-
   const fetchPKPs = async (authMethod: string) => {
     setLoading(true);
     setPkps([]);
@@ -150,6 +149,7 @@ export default function Home() {
 
   return (
     <div className="p-4 text-2xl">
+     
       <h1 className="mb-4">Your PKP will now need permission scopes, (eg. getting session sigs)</h1>
 
       <p className="mb-4">
@@ -191,7 +191,7 @@ export default function Home() {
                   {
                     !p.scopes.signAnything && !p.scopes.onlySignMessages && (
                       <span className="block mb-2 text-sm font-medium text-red-600 bg-red-100 rounded px-3 py-1">
-                        DEPRECATED! This PKP has no permission scopes. Use a new one of fund this PKP with Lit token in order to add permission scopes using to permissions contract.
+                        DEPRECATED! This PKP has no permission scopes. Use a new one or fund this PKP with Lit tokens to add permission scopes through the permissions contract.
                       </span>
                     )
                   }
