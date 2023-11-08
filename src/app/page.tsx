@@ -1,113 +1,207 @@
-import Image from 'next/image'
+'use client';
+import { LitNodeClient } from '@lit-protocol/lit-node-client';
+import { LitAuthClient } from '@lit-protocol/lit-auth-client';
+import { LitContracts } from '@lit-protocol/contracts-sdk';
+import { ProviderType, AuthMethodType } from '@lit-protocol/constants';
+import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
+import { useState } from 'react';
+
+// @ts-ignore
+import dJSON from 'dirty-json';
+import { ethers } from 'ethers';
 
 export default function Home() {
+
+  const [authMethod, setAuthMethod] = useState('');
+  const [pkps, setPkps] = useState<any>([]);
+  const [loading, setLoading] = useState(false);
+
+
+  const getContext = async (): Promise<{
+    _authMethod: any,
+    litAuthClient: LitAuthClient,
+    permissionsContract: any,
+  }> => {
+    // 1. connect to lit nodes
+    const litNodeClient = new LitNodeClient({ litNetwork: 'cayenne', debug: false });
+    await litNodeClient.connect();
+
+    // 2. connect to lit auth
+    const litAuthClient = new LitAuthClient({
+      litRelayConfig: {
+        relayApiKey: '78e5179b1766c98836b29099732a9cc6-2023-08-11-sessionsigs-permission-scopes',
+      },
+      litNodeClient
+    });
+
+    // try parsing the auth method
+    let _authMethod;
+
+    try {
+      _authMethod = dJSON.parse(authMethod);
+    } catch (e) {
+      alert('Invalid auth method');
+      throw new Error('Invalid auth method')
+    }
+
+    // 3. connect to lit contracts
+    const litContracts = new LitContracts();
+    await litContracts.connect();
+
+    // 4. use the permissions contract to fetch the token ids
+    const permissionsContract = litContracts.pkpPermissionsContract;
+
+    return {
+      _authMethod,
+      litAuthClient,
+      permissionsContract,
+    }
+  }
+
+
+  const handleSignAnything = async (pkp: any) => {
+    const { _authMethod, litAuthClient, permissionsContract } = await getContext();
+  }
+
+  const handleSignMessage = async (pkp: any) => {
+    const { _authMethod, litAuthClient, permissionsContract } = await getContext();
+    console.log("pkp:", pkp);
+    const litContracts = new LitContracts();
+  }
+
+
+  const fetchPKPs = async (authMethod: string) => {
+    setLoading(true);
+    setPkps([]);
+
+    const { _authMethod, litAuthClient, permissionsContract } = await getContext();
+
+    let tokenIds;
+    let authId;
+    switch (_authMethod.authMethodType) {
+      // eth wallet
+      case AuthMethodType.EthWallet:
+        var authProvider = litAuthClient.initProvider(ProviderType.EthWallet);
+        authId = await authProvider.getAuthMethodId(_authMethod);
+        tokenIds = await permissionsContract.read.getTokenIdsForAuthMethod(AuthMethodType.EthWallet, authId);
+        break;
+      case AuthMethodType.GoogleJwt:
+        var authProvider = litAuthClient.initProvider(ProviderType.Google);
+        authId = await authProvider.getAuthMethodId(_authMethod);
+        tokenIds = await permissionsContract.read.getTokenIdsForAuthMethod(AuthMethodType.GoogleJwt, authId);
+        break;
+      case AuthMethodType.Discord:
+        var authProvider = litAuthClient.initProvider(ProviderType.Discord);
+        authId = await authProvider.getAuthMethodId(_authMethod);
+        tokenIds = await permissionsContract.read.getTokenIdsForAuthMethod(AuthMethodType.Discord, authId);
+        break;
+      case AuthMethodType.StytchOtp:
+        var authProvider = litAuthClient.initProvider(ProviderType.StytchOtp);
+        authId = await authProvider.getAuthMethodId(_authMethod);
+        tokenIds = await permissionsContract.read.getTokenIdsForAuthMethod(AuthMethodType.StytchOtp, authId);
+        break;
+      case AuthMethodType.WebAuthn:
+        var authProvider = litAuthClient.initProvider(ProviderType.WebAuthn);
+        authId = await authProvider.getAuthMethodId(_authMethod);
+        tokenIds = await permissionsContract.read.getTokenIdsForAuthMethod(AuthMethodType.WebAuthn, authId);
+        break;
+      default:
+        alert('Unsupported auth method type');
+        return;
+    };
+
+    console.log("tokenIds:", tokenIds);
+
+    // -- get the pkps
+    const pkps = [];
+    for (let i = 0; i < tokenIds.length; i++) {
+      const pubkey = await permissionsContract.read.getPubkey(tokenIds[i]);
+      if (pubkey) {
+        const ethAddress = ethers.utils.computeAddress(pubkey);
+
+        // check the permission scopes
+        const permissionScopes = await permissionsContract.read.getPermittedAuthMethodScopes(
+          tokenIds[i],
+          _authMethod.authMethodType,
+          authId,
+          3,
+        );
+
+        pkps.push({
+          authId: authId,
+          tokenId: tokenIds[i],
+          publicKey: pubkey,
+          ethAddress: ethAddress,
+          scopes: {
+            signAnything: permissionScopes[1],
+            onlySignMessages: permissionScopes[2],
+          },
+        });
+      }
+    }
+
+    // reverse the pkps order
+    pkps.reverse();
+
+
+    setPkps(pkps);
+    setLoading(false);
+  }
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
+    <div className="p-4 text-2xl">
+      <h1 className="mb-4">Your PKP will now need permission scopes, (eg. getting session sigs)</h1>
+
+      <p className="mb-4">
+        Copy and paste your auth method to fetch & check your PKPs' permission scopes.
+      </p>
+
+      <textarea
+        onChange={(e) => setAuthMethod(e.target.value)}
+        className="border-2 border-gray-300 rounded-md w-full p-2 mb-4 text-sm h-36"
+        id="code"
+        placeholder="Paste your auth method here... it should look like { authMethodType: 1, accessToken: {...}}"
+      />
+
+      <button onClick={() => fetchPKPs(authMethod)} className="border-1 bg-blue-500 p-2">Fetch PKPs</button>
+      <hr className="mt-4 mb-4" />
+
+      <h1 className="mb-4">Your PKPs (latest to oldest)</h1>
+
+      {loading && <div className="text-blue-500">
+        Loading...
+      </div>
+      }
+
+      <div className="text-sm mb mx-auto overflow-hidden bg-white rounded-lg shadow-md">
+        <ul className="divide-y divide-gray-200">
+          {
+            pkps?.length > 0 && pkps.map((p: any) => (
+              <li key={p.tokenId} className={`p-4 ${(p.scopes.signAnything || p.scopes.onlySignMessages) ? '' : ''}`}>
+                <h2 className="text-lg font-bold text-gray-700">Token ID: {p.tokenId.toString()}</h2>
+                <p className="text-gray-600">Public Key: {p.publicKey}</p>
+                <p className="text-gray-600">Eth Address: {p.ethAddress}</p>
+                <p className="text-gray-600">
+                  Scopes:{" "}
+                  <span className="font-medium">
+                    {p.scopes.signAnything ? "[1] Sign Anything" : ""}
+                    {p.scopes.onlySignMessages ? "[2] Only Sign Messages" : ""}
+                  </span>
+
+                  {
+                    !p.scopes.signAnything && !p.scopes.onlySignMessages && (
+                      <span className="block mb-2 text-sm font-medium text-red-600 bg-red-100 rounded px-3 py-1">
+                        DEPRECATED! This PKP has no permission scopes. Use a new one of fund this PKP with Lit token in order to add permission scopes using to permissions contract.
+                      </span>
+                    )
+                  }
+                </p>
+              </li>
+            ))
+          }
+        </ul>
       </div>
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
+    </div>
   )
 }
