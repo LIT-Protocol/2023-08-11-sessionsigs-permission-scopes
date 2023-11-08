@@ -45,9 +45,19 @@ export default function Home() {
     }
 
     // 3. connect to lit contracts
-    // let rpcProvider = new ethers.providers.JsonRpcPr ovider("https://chain-rpc.litprotocol.com/http", 175177);
+    // Create a random wallet
     const wallet = ethers.Wallet.createRandom();
-    const litContracts = new LitContracts({ privateKey: wallet.privateKey });
+
+    // Define custom RPC provider information
+    const customRpcProvider = new ethers.providers.JsonRpcProvider(
+      "https://chain-rpc.litprotocol.com/http",
+      175177  // This is the network ID
+    );
+
+    // Connect the wallet to the custom RPC provider
+    const walletWithProvider = wallet.connect(customRpcProvider);
+
+    const litContracts = new LitContracts({ signer: walletWithProvider });
     await litContracts.connect();
 
     // 4. use the permissions contract to fetch the token ids
@@ -58,17 +68,6 @@ export default function Home() {
       litAuthClient,
       permissionsContract,
     }
-  }
-
-
-  const handleSignAnything = async (pkp: any) => {
-    const { _authMethod, litAuthClient, permissionsContract } = await getContext();
-  }
-
-  const handleSignMessage = async (pkp: any) => {
-    const { _authMethod, litAuthClient, permissionsContract } = await getContext();
-    console.log("pkp:", pkp);
-    const litContracts = new LitContracts();
   }
 
   const fetchPKPs = async (authMethod: string) => {
