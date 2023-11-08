@@ -45,7 +45,9 @@ export default function Home() {
     }
 
     // 3. connect to lit contracts
-    const litContracts = new LitContracts();
+    let rpcProvider = new ethers.providers.JsonRpcProvider("https://chain-rpc.litprotocol.com/http", 175177);
+
+    const litContracts = new LitContracts({ signer: rpcProvider });
     await litContracts.connect();
 
     // 4. use the permissions contract to fetch the token ids
@@ -149,7 +151,7 @@ export default function Home() {
 
   return (
     <div className="p-4 text-2xl">
-     
+
       <h1 className="mb-4">Your PKP will now need permission scopes, (eg. getting session sigs)</h1>
 
       <p className="mb-4">
