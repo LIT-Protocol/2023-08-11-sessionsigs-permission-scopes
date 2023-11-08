@@ -45,9 +45,9 @@ export default function Home() {
     }
 
     // 3. connect to lit contracts
-    let rpcProvider = new ethers.providers.JsonRpcProvider("https://chain-rpc.litprotocol.com/http", 175177);
-
-    const litContracts = new LitContracts({ signer: rpcProvider });
+    // let rpcProvider = new ethers.providers.JsonRpcPr ovider("https://chain-rpc.litprotocol.com/http", 175177);
+    const wallet = ethers.Wallet.createRandom();
+    const litContracts = new LitContracts({ privateKey: wallet.privateKey });
     await litContracts.connect();
 
     // 4. use the permissions contract to fetch the token ids
